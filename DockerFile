@@ -1,56 +1,68 @@
-FROM nvidia/cuda:12.6.1-devel-ubuntu22.04
+# Use an official base image with Python 3.10 support
+FROM ubuntu:22.04
 
 # Set the working directory
 WORKDIR /pai
 
-# Install dependencies in a single layer to optimize caching
+# Install system dependencies
 RUN apt update && apt upgrade -y && \
-    apt-get install -y \
-        net-tools \
+    apt install -y \
         software-properties-common \
+        curl \
+        git \
+        build-essential \
         python3.10 \
+        python3.10-distutils \
         python-is-python3 \
         python3-pip \
-        python3.10-distutils \
+        net-tools \
         npm \
         libsndfile1 \
         libasound2-dev \
         ffmpeg \
         autotools-dev \
         automake \
-        libtool \
-        curl \
-        git && \
-    add-apt-repository ppa:deadsnakes/ppa -y && \
+        libtool && \
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
-    curl https://bootstrap.pypa.io/get-pip.py | python && \
+    curl https://bootstrap.pypa.io/get-pip.py | python3.10 && \
     apt-get clean
 
-# Clone and build eSpeak-NG separately
+# Install Rust using rustup
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+
+# Add Rust to PATH
+ENV PATH="/root/.cargo/bin:$PATH"
+
+# Clone and build eSpeak-NG
 RUN git clone https://github.com/espeak-ng/espeak-ng.git /pai/espeak-ng
 WORKDIR /pai/espeak-ng
 RUN ./autogen.sh && ./configure --without-pulseaudio && make && make install
 
-# Copy only package files first to leverage Docker's cache for dependencies
+# Install Node dependencies
 WORKDIR /pai/web
 COPY web/package.json web/package-lock.json ./
 RUN npm install
 
+# Install Python dependencies
 WORKDIR /pai/api
 COPY api/requirements.txt ./
+RUN python3 -m pip install --upgrade pip setuptools wheel
 RUN pip3 install -r requirements.txt
 
-RUN CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --upgrade --force-reinstall --no-cache-dir
+# Install TTS and other tools (CPU only, no CUDA)
+RUN pip install llama-cpp-python --upgrade --force-reinstall --no-cache-dir
 RUN pip install --ignore-installed --no-cache-dir -U blinker
-RUN pip3 install TTS
-RUN pip3 install simpleaudio gtts fastapi==0.112.0
+RUN pip install TTS
+RUN pip install simpleaudio gtts fastapi==0.112.0
 
+# Set default environment variable
 ENV OPENAI_API_KEY=${OPENAI_API_KEY:-"DUMMY-KEY"}
 
-# Now copy the rest of the project files
+# Copy the rest of the project
 COPY . /pai
 
-# Expose port 4000 for the application
+# Expose port 4000 for the web service
 EXPOSE 4000
 
+# Default command to start the web application
 CMD ["npm", "start", "--prefix", "/pai/web"]

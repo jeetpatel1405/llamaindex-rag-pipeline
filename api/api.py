@@ -65,12 +65,14 @@ log_level = getattr(logging, log_level_str, logging.WARNING)
 
 def chatbot(data):
     global tts
-    dataobj = json.loads(data)
-    input_text=  dataobj["prompt"]
-    isvideo= dataobj["video"]
-    isaudio= dataobj["audio"]
-
-    print("User Text:" + input_text + " Video:"+ str(isvideo) + " Audio:"+ str(isaudio))    
+    # dataobj = json.loads(data)
+    # input_text=  dataobj["prompt"]
+    # isvideo= dataobj["video"]
+    # isaudio= dataobj["audio"]
+    isvideo = False
+    isaudio = False
+    input_text = data
+    print("User Text:" + str(input_text) + " Video:"+ str(isvideo) + " Audio:"+ str(isaudio))    
     
     response =query_engine.query(input_text)        
  
@@ -112,9 +114,9 @@ def chatbot(data):
     # Creating the JSON object structure
     jsonResponse = {
         "response": response.response,
-        "video": output_vidfile,
-        "audio": output_audfile,
-        "citation": citation
+        # "video": output_vidfile,
+        # "audio": output_audfile,
+        # "citation": citation
     }
     
     # Convert to JSON string
@@ -140,33 +142,33 @@ from langchain_community.cache import InMemoryCache
 # Get stop words from config and split them into a list
 stop_words = config.get("Prompt", "stop_words", fallback="").split(", ")
 
-if useopenai:
-    from langchain_openai import ChatOpenAI
-    modelname = config['api']['openai_modelname']
-    llm = ChatOpenAI( model=modelname,  openai_api_base=openai_api_base, temperature=0.6, max_tokens=512,**{"streaming": False})
-else:
-    modelname = config['api']['local_modelname']
-    n_gpu_layers = -1  # Change this value based on your model and your GPU VRAM pool.
-    n_batch = 2048  # Should be between 1 and n_ctx, consider the amount of VRAM in your GPU.
-    
-    #cache prompt/response pairs for faster retrieval next time.
-    set_llm_cache(InMemoryCache())
-    
-    llm = LlamaCpp(
-    model_path="./models/"+ modelname,
-    cache=True,
-    n_gpu_layers=n_gpu_layers,
-    n_batch=n_batch,
-    n_ctx=2048,
-    n_threads=8,
-    temperature=0.01,
-    max_tokens=512,
-    f16_kv=True,
-    repeat_penalty=1.1,    
-    top_p=0.95,
-    top_k=40,
-    stop=stop_words
-    )
+# if useopenai:
+#     from langchain_openai import ChatOpenAI
+#     modelname = config['api']['openai_modelname']
+#     llm = ChatOpenAI( model=modelname, temperature=0.6, max_tokens=512,**{"streaming": False})
+
+modelname = config['api']['local_modelname']
+n_gpu_layers = -1  # Change this value based on your model and your GPU VRAM pool.
+n_batch = 2048  # Should be between 1 and n_ctx, consider the amount of VRAM in your GPU.
+
+#cache prompt/response pairs for faster retrieval next time.
+set_llm_cache(InMemoryCache())
+
+llm = LlamaCpp(
+model_path="./models/"+ modelname,
+cache=True,
+n_gpu_layers=n_gpu_layers,
+n_batch=n_batch,
+n_ctx=2048,
+n_threads=8,
+temperature=0.01,
+max_tokens=512,
+f16_kv=True,
+repeat_penalty=1.1,    
+top_p=0.95,
+top_k=40,
+stop=stop_words
+)
 
 
 Settings.llm = llm
@@ -222,4 +224,4 @@ query_engine.update_prompts(
 )
 
 
-iface.launch( share=False, server_name=serverip, server_port=int(serverport), ssl_verify=False, ssl_keyfile=sslkey, ssl_certfile=sslcert)
+iface.launch( share=True, server_name=serverip, server_port=int(serverport), ssl_verify=False, ssl_keyfile=sslkey, ssl_certfile=sslcert)

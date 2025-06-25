@@ -44,9 +44,10 @@ def construct_basic_index(src_directory_path,index_directory):
         model_path="./models/"+ modelname,
         n_gpu_layers=n_gpu_layers,
         n_batch=n_batch,
-        n_ctx=4096,
-        n_threads=8,
+        n_ctx=512,
+        n_threads=4,
         temperature=0.1,
+        use_mlock = True,
         f16_kv=True
         )
 
